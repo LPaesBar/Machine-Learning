@@ -1,0 +1,98 @@
+---
+title: "Practical Machine Learning - Course Project"
+author: "Lillyan Paes Barreto"
+date: "June,19 2018"
+output: html_document
+---
+
+## Introduction
+
+The present work is a part of the Practical Machine Learning course on Coursera. It was analysed the data from PUC-Rio's project called Human Activity Recognition. The idea of this project is to collect data from devices such as Jawbone Up, Nike FuelBand, and Fitbit to not only monitor how much of an activity one does, but also how well this activity is made. For this specific dataset, six subjects were monitored while doing barbell lifts correctly and incorrectly in 5 different ways. The goal of this work is to create a model that predicts how well the subject did the exercised using machine learning.
+
+## Reading the data into R
+
+This first chunk of code reads the train and test sets into R from the directory.
+
+```{r setup, include=TRUE}
+setwd("C:/Users/Lillyan/Desktop/Coursera/Practical Machine Learning")
+training = read.csv("pml-training.csv")
+testing = read.csv("pml-testing.csv")
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Treating the data
+
+  On this part, I cleaned up the data by taking out the columns there are filled only with NAs and those variables that have near zero values and beacuse of that cannot explain the variance in the Classe variable.I also preprocessed both data sets using Principal Components Analysis (PCA) to reduce the number of variables.
+
+```{r uploading, include=TRUE}
+library(caret)
+training = training[, -colSums(is.na(training)) == 0]
+testing = testing[, -colSums(is.na(testing)) == 0]
+preproc = preProcess(training[,-93],method="pca")
+trainingpc = predict(preproc,training[,-93])
+testingpc = predict(preproc,testing)
+nearztrain = nearZeroVar(trainingpc)
+nearztest = nearZeroVar(testingpc)
+trainingpc = trainingpc[,-nearztrain]
+testingpc =testingpc[,-nearztest]
+trainingpc$classe = training$classe
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Cross Validation
+
+  Since we need an out of sample error estimate, I subset the training data into a train.training subset, which I later use to build the model, and a test.training, which I use to estimate my out of sample error.
+
+```{r cv, include=TRUE}
+in.train.training = createDataPartition(trainingpc$classe,p = 0.75,list=FALSE)
+train.training = trainingpc[in.train.training,]
+test.training = trainingpc[-in.train.training,]
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Build the model
+
+  I chose to fit the model as a random forest tree. My choice was due to the fact that the ploblem was a classification one. Also, the random forest model is better performing than a single classification tree since it is similar to bagging. For fitting the model, I used the randomForest package because the train fucntion was taking too long to process on my computer.
+
+```{r model, include=TRUE}
+library(randomForest)
+
+mod = randomForest(classe~.,data= train.training, mtry =5 , ntree=400, keep.forest=TRUE, importance=TRUE)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Out of sample error
+
+In order to compute the out of sample error, I predicted the classifications using the model and the test.training set (the one I subset to cross validate). Later, I used a confusion matrix to estimate the accuracy of my model and subsequent out of sample error.
+
+```{r out, include=TRUE}
+predictions = predict(mod, newdata = test.training)
+confmatrix= confusionMatrix(test.training$classe,predictions)
+accuracy = confmatrix$overall[[1]]
+out.of.sample.error = 1 - accuracy
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+  The out of sample error estimate is `r out.of.sample.error`. Below, it is shown the confusion matrix of the predictions made with the model and the obsevarions from the test.training set.
+
+```{r acc, include=TRUE}
+confmatrix$table
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Predicting the test set
+
+In this part, I use my model to predict the classes of the 20 test cases from the testing data set.The results are as follows.
+
+```{r pred, include=TRUE}
+testingpc = testingpc[,-3]
+testingpc = rbind(train.training[1,-30] , testingpc)
+testingpc = testingpc[-1,]
+predict(mod,newdata = testingpc)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
